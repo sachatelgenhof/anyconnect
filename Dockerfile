@@ -14,7 +14,8 @@ RUN echo 'debconf debconf/frontend select Noninteractive' | debconf-set-selectio
     iptables \
     ca-certificates \
     file \
-    gettext-base
+    gettext-base \
+    libgtk2.0-0
 
 RUN mkdir /root/Install
 WORKDIR /root/Install
@@ -37,6 +38,7 @@ COPY docker/entrypoint.sh /entrypoint.sh
 COPY docker/fix-firewall.sh /fix-firewall.sh
 COPY docker/systemctl /sbin/systemctl
 COPY docker/start-traps.sh /start-traps.sh
+COPY docker/start-vpn.sh /start-vpn.sh
 
 RUN chmod +x /entrypoint.sh && \
     chmod +x /fix-firewall.sh && \
