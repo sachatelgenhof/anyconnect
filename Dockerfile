@@ -43,6 +43,8 @@ COPY docker/fix-firewall.sh /fix-firewall.sh
 COPY docker/systemctl /sbin/systemctl
 COPY docker/start-traps.sh /start-traps.sh
 
+RUN mkdir -p /opt/foil && touch /opt/foil/.breathe.txt
+
 RUN chmod +x /entrypoint.sh && \
     chmod +x /fix-firewall.sh && \
     chmod +x /sbin/systemctl && \
