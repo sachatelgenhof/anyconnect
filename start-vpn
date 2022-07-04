@@ -2,113 +2,125 @@
 
 DOCKER=docker
 if podman --version >/dev/null 2>&1; then
-  echo "Using Podman as Docker client"
-  DOCKER=podman
+	echo "Using Podman as Docker client"
+	DOCKER=podman
 fi
 
 if [[ $EUID -ne 0 ]]; then
-  echo "Please run the start-vpn script as as root" 1>&2
-  exit 1
+	echo "Please run the start-vpn script as as root" 1>&2
+	exit 1
 fi
 
 DIR=$(cd -P -- "$(dirname -- "$(readlink -f "$0")")" && pwd -P)
 cd "$DIR"
 
 if [ ! -f packages/anyconnect.tar.gz ]; then
-  echo "Please place your anyconnect linux packages in packages/anyconnect.tar.gz"
-  exit 1
+	echo "Please place your anyconnect linux packages in packages/anyconnect.tar.gz"
+	exit 1
 fi
 
 if [ ! -f packages/cortex.deb ]; then
-  echo "Please place your cortex/traps installer in packages/cortex.deb"
-  exit 1
+	echo "Please place your cortex/traps installer in packages/cortex.deb"
+	exit 1
 fi
 
 if systemctl -q is-active systemd-resolved.service 2>/dev/null; then
-  if [ ! -f config/systemd-resolved.template ]; then
-    echo "Please create a systemd-resolved config template and place it in file config/systemd-resolved.template"
-    exit 1
-  fi
-  USE_SYSTEMD_RESOLVED=true
+	if [ ! -f config/systemd-resolved.template ]; then
+		echo "Please create a systemd-resolved config template and place it in file config/systemd-resolved.template"
+		exit 1
+	fi
+	USE_SYSTEMD_RESOLVED=true
 elif [ ! -f config/resolv.template ]; then
-  echo "Please create a resolve.conf template and place it in file config/resolv.template"
-  exit 1
+	echo "Please create a resolve.conf template and place it in file config/resolv.template"
+	exit 1
 fi
 
 if [ -f config/response.txt ]; then
-  if ! grep -q '\$VPN_PASSWORD' config/response.txt; then
-    echo 'Please make sure to reference VPN_PASSWORD in config/response.txt'
-    exit 1
-  fi
+	if ! grep -q '\$VPN_PASSWORD' config/response.txt; then
+		echo 'Please make sure to reference VPN_PASSWORD in config/response.txt'
+		exit 1
+	fi
 
-  while [ -z "$VPN_PASSWORD" ]; do
-    echo -n 'VPN password: '
-    read -sr VPN_PASSWORD
-    echo
-  done
-  export VPN_PASSWORD
+	while [ -z "$VPN_PASSWORD" ]; do
+		echo -n 'VPN password: '
+		read -sr VPN_PASSWORD
+		echo
+	done
+	export VPN_PASSWORD
 
-  MOUNT_RESPONSE_FILE="-e VPN_PASSWORD -v $(pwd)/config/response.txt:/response.txt"
+	if ! grep -q '\$TOTP' config/response.txt; then
+		echo 'Please make sure to reference TOTP in config/response.txt'
+		exit 1
+	fi
+
+	while [ -z "$TOTP" ]; do
+		echo -n 'TOTP: '
+		read -sr TOTP
+		echo
+	done
+	export TOTP
+
+	MOUNT_RESPONSE_FILE="-e VPN_PASSWORD -e TOTP -v $(pwd)/config/response.txt:/response.txt"
 else
-  MOUNT_RESPONSE_FILE=''
+	MOUNT_RESPONSE_FILE=''
 fi
 
 if [ -f config/AnyConnectProfile.xml ]; then
-  MOUNT_ANYCONNECT_PROFILE="-v $(pwd)/config/AnyConnectProfile.xml:/opt/cisco/anyconnect/profile/AnyConnectProfile.xml"
+	MOUNT_ANYCONNECT_PROFILE="-v $(pwd)/config/AnyConnectProfile.xml:/opt/cisco/anyconnect/profile/AnyConnectProfile.xml"
 else
-  MOUNT_ANYCONNECT_PROFILE=''
+	MOUNT_ANYCONNECT_PROFILE=''
 fi
 . config/routes
 
-"$DOCKER" network ls | grep vpn-network > /dev/null
+"$DOCKER" network ls | grep vpn-network >/dev/null
 HAS_NETWORK=$?
 if [ $HAS_NETWORK -ne 0 ]; then
-  echo "Creating docker network for VPN"
-  "$DOCKER" network create --subnet=172.19.0.0/16 vpn-network
+	echo "Creating docker network for VPN"
+	"$DOCKER" network create --subnet=172.19.0.0/16 vpn-network
 fi
 
 echo "Enabling cross-docker bridge communications with VPN"
-NETWORK_ID=br-`"$DOCKER" network ls | grep vpn-network | cut -f 1 -d' '`
+NETWORK_ID=br-$("$DOCKER" network ls | grep vpn-network | cut -f 1 -d' ')
 iptables -F DOCKER-USER
 iptables -A DOCKER-USER -o $NETWORK_ID -j ACCEPT
 iptables -A DOCKER-USER -i $NETWORK_ID -j ACCEPT
 
-"$DOCKER" image ls | grep vpn-anyconnect > /dev/null
+"$DOCKER" image ls | grep vpn-anyconnect >/dev/null
 HAS_IMAGE=$?
 if [ $HAS_IMAGE -ne 0 ]; then
-  echo "Creating docker image for VPN"
-  "$DOCKER" build --tag vpn-anyconnect . 
+	echo "Creating docker image for VPN"
+	"$DOCKER" build --tag vpn-anyconnect .
 else
-  echo 'Updating Docker image...'
-  "$DOCKER" build -q --tag vpn-anyconnect . >/dev/null || exit 1
+	echo 'Updating Docker image...'
+	"$DOCKER" build -q --tag vpn-anyconnect . >/dev/null || exit 1
 fi
 
 echo "Starting VPN"
 
 if [ -z $USE_SYSTEMD_RESOLVED ]; then
-  mv /etc/resolv.conf /etc/resolv.conf.vpn-orig
-  cp config/resolv.template /etc/resolv.conf
-  chmod a+r /etc/resolv.conf
+	mv /etc/resolv.conf /etc/resolv.conf.vpn-orig
+	cp config/resolv.template /etc/resolv.conf
+	chmod a+r /etc/resolv.conf
 else
-  mkdir -p /etc/systemd/resolved.conf.d/
-  cp config/systemd-resolved.template /etc/systemd/resolved.conf.d/anyconnect-dns-settings.conf
-  systemctl restart systemd-resolved.service
+	mkdir -p /etc/systemd/resolved.conf.d/
+	cp config/systemd-resolved.template /etc/systemd/resolved.conf.d/anyconnect-dns-settings.conf
+	systemctl restart systemd-resolved.service
 fi
 
 for r in ${routes[@]}; do
-  ip route add $r via 172.19.0.2
+	ip route add $r via 172.19.0.2
 done
 
 "$DOCKER" run --name vpn-anyconnect --hostname $(hostname) --privileged --cap-add NET_ADMIN --cap-add SYS_ADMIN -ti $MOUNT_RESPONSE_FILE $MOUNT_ANYCONNECT_PROFILE --net vpn-network --ip 172.19.0.2 --rm vpn-anyconnect
 echo "Restoring original configuration"
 
 for r in ${routes[@]}; do
-  ip route del $r via 172.19.0.2
+	ip route del $r via 172.19.0.2
 done
 
 if [ -z $USE_SYSTEMD_RESOLVED ]; then
-  mv /etc/resolv.conf.vpn-orig /etc/resolv.conf
+	mv /etc/resolv.conf.vpn-orig /etc/resolv.conf
 else
-  rm /etc/systemd/resolved.conf.d/anyconnect-dns-settings.conf
-  systemctl restart systemd-resolved.service
+	rm /etc/systemd/resolved.conf.d/anyconnect-dns-settings.conf
+	systemctl restart systemd-resolved.service
 fi
