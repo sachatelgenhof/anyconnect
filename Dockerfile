@@ -34,7 +34,7 @@ COPY packages/cortex.deb .
 
 RUN tar xzf anyconnect.tar.gz && \
     mv cisco-secure-client-linux64-* anyconnect && \
-    bash -c "mkdir -p /usr/share/icons/hicolor/{48x48,64x64,96x96,128x128,256x256}/apps /usr/share/desktop-directories /usr/share/applications/"
+    bash -c "mkdir -p /usr/share/icons/hicolor/{48x48,64x64,96x96,128x128,256x256}/apps /usr/share/desktop-directories /usr/share/applications/" 
 
 WORKDIR /root/Install/anyconnect/vpn
 RUN yes | ./vpn_install.sh 2 > /dev/null
@@ -50,8 +50,6 @@ COPY docker/entrypoint.sh /entrypoint.sh
 COPY docker/fix-firewall.sh /fix-firewall.sh
 COPY docker/systemctl /sbin/systemctl
 COPY docker/start-traps.sh /start-traps.sh
-
-RUN mkdir -p /opt/foil && touch /opt/foil/.breathe.txt
 
 RUN chmod +x /entrypoint.sh && \
     chmod +x /fix-firewall.sh && \

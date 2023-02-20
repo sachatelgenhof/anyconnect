@@ -74,7 +74,7 @@ fi
 HAS_NETWORK=$?
 if [ $HAS_NETWORK -ne 0 ]; then
   echo "Creating docker network for VPN"
-  "$DOCKER" network create --subnet=10.200.64.0/24 vpn-network
+  "$DOCKER" network create --subnet=172.19.0.2/16 vpn-network
 fi
 
 echo "Enabling cross-docker bridge communications with VPN"
@@ -97,25 +97,25 @@ echo "Starting VPN"
 
 if [ -z $USE_SYSTEMD_RESOLVED ]; then
   mv /etc/resolv.conf /etc/resolv.conf.vpn-orig
-  sed -i 's/172\.19\.0\.2/10.200.64.2/' config/resolv.template
+  #sed -i 's/172\.19\.0\.2/10.200.64.2/' config/resolv.template
   cp config/resolv.template /etc/resolv.conf
   chmod a+r /etc/resolv.conf
 else
   mkdir -p /etc/systemd/resolved.conf.d/
-  sed -i 's/172\.19\.0\.2/10.200.64.2/' config/systemd-resolved.template
+  #sed -i 's/172\.19\.0\.2/10.200.64.2/' config/systemd-resolved.template
   cp config/systemd-resolved.template /etc/systemd/resolved.conf.d/anyconnect-dns-settings.conf
   systemctl restart systemd-resolved.service
 fi
 
 for r in ${routes[@]}; do
-  ip route add $r via 10.200.64.2
+  ip route add $r via 172.19.0.2
 done
 
-"$DOCKER" run --name vpn-anyconnect --hostname $(hostname) --privileged --cap-add NET_ADMIN --cap-add SYS_ADMIN -ti $MOUNT_RESPONSE_FILE $MOUNT_ANYCONNECT_PROFILE --net vpn-network --ip 10.200.64.2 --rm vpn-anyconnect
+"$DOCKER" run --name vpn-anyconnect --hostname $(hostname) --privileged --cap-add NET_ADMIN --cap-add SYS_ADMIN -ti $MOUNT_RESPONSE_FILE $MOUNT_ANYCONNECT_PROFILE --net vpn-network --ip 172.19.0.2 --rm vpn-anyconnect
 echo "Restoring original configuration"
 
 for r in ${routes[@]}; do
-  ip route del $r via 10.200.64.2
+  ip route del $r via 172.19.0.2
 done
 
 if [ -z $USE_SYSTEMD_RESOLVED ]; then

@@ -15,7 +15,5 @@ keep_forwarding_clear() {
   fi
 }
 
-while true; do
-	keep_forwarding_clear
-	sleep 1
-done
+while true; do keep_forwarding_clear; sleep 1; done
+
