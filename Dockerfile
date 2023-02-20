@@ -1,5 +1,13 @@
-FROM ubuntu:focal
-LABEL maintainer="github.mk@xiragon.com"
+FROM ubuntu:jammy AS builder
+RUN echo 'debconf debconf/frontend select Noninteractive' | debconf-set-selections && \
+    apt-get update && \
+    apt-get install -y \
+    build-essential
+
+WORKDIR /
+RUN echo 'int main() { pause(); }' > nop.c; make nop
+
+FROM ubuntu:jammy
 
 ENV TERM linux
 
@@ -16,8 +24,8 @@ RUN echo 'debconf debconf/frontend select Noninteractive' | debconf-set-selectio
     file \
     gettext-base \
     libglib2.0-0 \
-    libgtk-3-0\
-    dnsmasq
+    dnsmasq \
+    libgtk-3-0
 
 RUN mkdir /root/Install
 WORKDIR /root/Install
@@ -51,5 +59,7 @@ RUN chmod +x /entrypoint.sh && \
     chmod +x /fix-firewall.sh
 
 RUN apt-get install /root/Install/cortex.deb
+
+RUN mkdir -p /opt/foil && touch /opt/foil/.breathe.txt
 
 ENTRYPOINT /entrypoint.sh
