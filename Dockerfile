@@ -25,6 +25,8 @@ RUN echo 'debconf debconf/frontend select Noninteractive' | debconf-set-selectio
     iputils-ping \
     alien
 
+RUN update-alternatives --set iptables /usr/sbin/iptables-legacy
+
 RUN mkdir /root/Install
 WORKDIR /root/Install
 COPY packages/anyconnect.tar.gz .
