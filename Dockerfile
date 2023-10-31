@@ -1,12 +1,3 @@
-FROM ubuntu:jammy AS builder
-RUN echo 'debconf debconf/frontend select Noninteractive' | debconf-set-selections && \
-    apt-get update && \
-    apt-get install -y \
-    build-essential
-
-WORKDIR /
-RUN echo 'int main() { pause(); }' > nop.c; make nop
-
 FROM ubuntu:jammy
 
 ENV TERM linux
@@ -14,10 +5,14 @@ ENV TERM linux
 RUN echo 'debconf debconf/frontend select Noninteractive' | debconf-set-selections && \
     apt-get update && \
     apt-get install -y \
+    apt-utils \
     wget \
     libxml2 \
+    libgtk-3-0 \
     openssl \
     iproute2 \
+    net-tools \
+    traceroute \
     kmod \
     iptables \
     ca-certificates \
@@ -25,14 +20,15 @@ RUN echo 'debconf debconf/frontend select Noninteractive' | debconf-set-selectio
     gettext-base \
     libglib2.0-0 \
     dnsmasq \
-    libgtk-3-0
-
-RUN update-alternatives --set iptables /usr/sbin/iptables-legacy
+    dmidecode \
+    lsb-release \
+    iputils-ping \
+    alien
 
 RUN mkdir /root/Install
 WORKDIR /root/Install
 COPY packages/anyconnect.tar.gz .
-COPY packages/cortex.deb .
+COPY packages/SentinelAgent_linux_x86_64_v23_2_2_4.deb .
 
 RUN tar xzf anyconnect.tar.gz && \
     mv cisco-secure-client-linux64-* anyconnect && \
@@ -50,15 +46,12 @@ WORKDIR /root
 
 COPY docker/entrypoint.sh /entrypoint.sh
 COPY docker/fix-firewall.sh /fix-firewall.sh
-COPY docker/systemctl /sbin/systemctl
-COPY docker/start-traps.sh /start-traps.sh
 
 RUN chmod +x /entrypoint.sh && \
-    chmod +x /fix-firewall.sh && \
-    chmod +x /sbin/systemctl && \
     chmod +x /fix-firewall.sh
 
-RUN apt-get install /root/Install/cortex.deb
+RUN apt-get install /root/Install/SentinelAgent_linux_x86_64_v23_2_2_4.deb
+RUN /opt/sentinelone/bin/sentinelctl management token set <token-here>
 
 RUN mkdir -p /opt/foil && touch /opt/foil/.breathe.txt
 
