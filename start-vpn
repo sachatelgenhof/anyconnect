@@ -74,7 +74,7 @@ fi
 HAS_NETWORK=$?
 if [ $HAS_NETWORK -ne 0 ]; then
 	echo "Creating docker network for VPN"
-	"$DOCKER" network create --subnet=172.19.0.2/16 vpn-network
+	"$DOCKER" network create --subnet=172.19.0.0/16 vpn-network
 fi
 
 echo "Enabling cross-docker bridge communications with VPN"
