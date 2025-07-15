@@ -4,7 +4,7 @@ keep_forwarding_clear() {
   iptables -w -L FORWARD | grep ciscovpn &>/dev/null
   FOUND=$?
 
-	if [ $FOUND -eq 0 ] ; then
+  if [ $FOUND -eq 0 ]; then
     echo Flushing forwarding restrictions
     iptables -w -F FORWARD
     echo Setting up masquarade
@@ -15,5 +15,7 @@ keep_forwarding_clear() {
   fi
 }
 
-while true; do keep_forwarding_clear; sleep 1; done
-
+while true; do
+  keep_forwarding_clear
+  sleep 1
+done
